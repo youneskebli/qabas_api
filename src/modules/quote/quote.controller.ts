@@ -1,10 +1,16 @@
-import {Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put} from '@nestjs/common';
+import {Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, UseGuards} from '@nestjs/common';
 import {CreateQuoteDto} from "./dto/createQuote.dto";
 import {GetAuthenticatedUser} from "../../commons/decorators/authenticated-user.decorator";
 import {User} from "../auth/entities/user.entity";
 import {QuoteService} from "./quote.service";
 import {UpdateQuoteDto} from "./dto/updateQuote.dto";
+import {AcceptedAuthGuard} from "../../commons/guards/accepted-auth.guard";
+import {Roles} from "../../commons/decorators/roles.decorator";
+import {Role} from "../../commons/enums/role.enum";
+import {AuthGuard} from "@nestjs/passport";
 
+@UseGuards(AuthGuard(),AcceptedAuthGuard)
+@Roles([Role.USER,Role.ADMIN])
 @Controller('quote')
 export class QuoteController {
     constructor(private quoteService:QuoteService) {
@@ -37,12 +43,12 @@ export class QuoteController {
         return this.quoteService.createQuote(user,bookId,createQuoteDto)
     }
 
-    @Put(':id')
+    @Put('update/:id')
     updateQuote(@GetAuthenticatedUser() user:User,@Param('id',ParseIntPipe) id:number,@Body() updateQuoteDto:UpdateQuoteDto){
         return this.quoteService.updateQuote(user,id,updateQuoteDto)
     }
 
-    @Delete(':id')
+    @Delete('delete/:id')
     deleteQuote(@GetAuthenticatedUser() user:User,@Param('id',ParseIntPipe) id:number) {
         return this.quoteService.deleteQuote(user,id)
     }

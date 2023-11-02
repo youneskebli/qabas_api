@@ -20,15 +20,12 @@ export class Quote extends BaseEntity {
     @ManyToOne(()=>User,user=>user.quotes)
     user:User
 
-    // foreign key
-    @Column({nullable:true})
-    userId:number
-
-    // foreign key
-    @Column({nullable:true})
-    authorId:number
-
-    // foreign key
-    @Column({nullable:true})
-    bookId:number
+    // @Column({nullable:true})
+    // userId:number
+    //
+    // @Column({nullable:true})
+    // authorId:number
+    //
+    // @Column({nullable:true})
+    // bookId:number
 }

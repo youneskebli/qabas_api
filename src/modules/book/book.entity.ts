@@ -5,7 +5,6 @@
     import {Category} from "../category/category.entity";
     import {BookLanguageEnum} from "../../commons/enums/language.enum";
     import {SubCategory} from "../sub-category/subCategory.entity";
-import { JoinAttribute } from "typeorm/query-builder/JoinAttribute";
     
     @Entity('books')
     export class Book extends BaseEntity {

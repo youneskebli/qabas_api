@@ -2,7 +2,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from "@nestjs/common";
 import { AuthCredentialsDto } from "./dto/auth-credentials.dto";
 import { AuthService } from "./auth.service";
-import { EmailLoginDto } from "./dto/emailLogin.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { AuthGuard } from "@nestjs/passport";
 import { UserAuthGuard } from "src/commons/guards/user-auth.guard";
@@ -12,6 +11,7 @@ import { GetAuthenticatedUser } from "src/commons/decorators/authenticated-user.
 import { User } from "./entities/user.entity";
 import { AdminAuthGuard } from "src/commons/guards/admin-auth.guard";
 import {CreateProfileDto} from "./dto/createProfile.dto";
+import {EmailUserNameLoginDto} from "./dto/emailLogin.dto";
 
 @Controller('auth')
 export class AuthController {
@@ -19,15 +19,14 @@ export class AuthController {
 
     @Post('register/user')
     signup(
-        @Body('authCredentialsDto') authCredentialsDto:AuthCredentialsDto,
-        @Body('createProfileDto') createProfileDto:CreateProfileDto
+        @Body('authCredentialsDto') authCredentialsDto:AuthCredentialsDto
     ){
-      return this.authService.signUp(authCredentialsDto,createProfileDto);
+      return this.authService.signUp(authCredentialsDto);
     }
 
     @Post('login/user')
-    SignInUser(@Body('emailLoginDto') emailLoginDto:EmailLoginDto) {
-      return this.authService.signInUser(emailLoginDto);
+    SignInUser(@Body('emailUserNameLoginDto') emailUserNameLoginDto:EmailUserNameLoginDto) {
+      return this.authService.signInUser(emailUserNameLoginDto);
     }
 
     @Get('email/send-email-verification/:email')
@@ -67,8 +66,8 @@ export class AuthController {
     }
 
     @Post('login/admin')
-    SignInAdmin(@Body('emailLoginDto') emailLoginDto:EmailLoginDto) {
-      return this.authService.signInAdmin(emailLoginDto);
+    SignInAdmin(@Body('emailUserNameLoginDto') emailUserNameLoginDto:EmailUserNameLoginDto) {
+      return this.authService.signInAdmin(emailUserNameLoginDto);
     }
 
   @Get('system-users')

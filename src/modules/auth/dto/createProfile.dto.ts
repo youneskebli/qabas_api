@@ -2,6 +2,8 @@ import {IsEnum, IsInt, IsString, Max, Min} from "class-validator";
 import {Gender} from "../../../commons/enums/gender.enum";
 
 export class CreateProfileDto {
+
+
     @IsString()
     firstname:string;
     @IsString()

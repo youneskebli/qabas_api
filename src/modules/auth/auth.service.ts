@@ -8,7 +8,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { EmailVerification } from "./entities/email-verification.entity";
 import { DeleteResult, Repository } from "typeorm";
 import { Nodemailer, NodemailerDrivers } from "@crowdlinker/nestjs-mailer";
-import { EmailLoginDto } from "./dto/emailLogin.dto";
+import { EmailUserNameLoginDto} from "./dto/emailLogin.dto";
 import { JwtService } from "@nestjs/jwt";
 import { JwtPayload } from "src/commons/interfaces/jwt-interface";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
@@ -28,8 +28,7 @@ export class AuthService {
               private profileService:ProfileService,
     ) {}
 
-  async signUp(authCredentialsDto: AuthCredentialsDto,
-      createProfileDto: CreateProfileDto): Promise<void> {
+  async signUp(authCredentialsDto: AuthCredentialsDto): Promise<void> {
 const { username, password, email } = authCredentialsDto;
 if (!this.IsValidEmail(email)) {
 throw new BadRequestException('You have entered invalid email');
@@ -51,7 +50,7 @@ user.email = email;
 
 user.roles = [Role.USER];
 user.password = await this.userRepository.hashPassword(password, user.salt);
-user.profile = await this.createProfile(user, createProfileDto);
+user.profile = new Profile();
 // sending emails verification
 await this.createEmailToken(email);
 await this.sendEmailVerification(email);
@@ -59,15 +58,11 @@ await this.sendEmailVerification(email);
 await user.save();
 }
 
-async signInUser(emailLoginDto:EmailLoginDto):Promise<{accessToken:string,user:User}> {
-   if(!(await this.IsValidEmail(emailLoginDto.email))) {
-    throw new BadRequestException("email not valid")
-   }
-   const {email,user} = await this.userRepository.validateUserPassword(emailLoginDto);
-   const payload :JwtPayload= {email};
+async signInUser(emailUserNameLoginDto:EmailUserNameLoginDto):Promise<{accessToken:string,user:User}> {
+   const {emailOrUserName,user} = await this.userRepository.validateUserPassword(emailUserNameLoginDto);
+   const payload :JwtPayload= {emailOrUserName};
    const accessToken= this.jwtService.sign(payload);
    return {accessToken,user};
-
 }
 
    
@@ -261,12 +256,9 @@ async getUserMainData(user:User):Promise<{user:User,profile:Profile}>{
   }
 }
 
-async signInAdmin(emailLoginDto:EmailLoginDto):Promise<{accessToken:string,user:User}> {
-  if(!( this.IsValidEmail(emailLoginDto.email))) {
-   throw new BadRequestException("email not valid")
-  }
-  const {email,user} = await this.userRepository.validateAdminPassword(emailLoginDto);
-  const payload :JwtPayload= {email};
+async signInAdmin(emailUserNameLoginDto:EmailUserNameLoginDto):Promise<{accessToken:string,user:User}> {
+  const {emailOrUserName,user} = await this.userRepository.validateAdminPassword(emailUserNameLoginDto);
+  const payload :JwtPayload= {emailOrUserName};
   const accessToken= this.jwtService.sign(payload);
   return {accessToken,user};
 

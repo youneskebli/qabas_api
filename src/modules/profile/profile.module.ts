@@ -8,7 +8,8 @@ import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 
 @Module({
-     imports: [TypeOrmModule.forFeature([Profile]), PassportModule.register({
+     imports: [TypeOrmModule.forFeature([Profile]),
+          PassportModule.register({
           defaultStrategy: AuthConstants.strategy,
         }),
      ],
