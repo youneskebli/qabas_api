@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from "@nestjs/common";
+import {Body, Controller, Delete, Get, NotFoundException, Param, Post, Put, UseGuards} from "@nestjs/common";
 import { AuthCredentialsDto } from "./dto/auth-credentials.dto";
 import { AuthService } from "./auth.service";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
@@ -12,10 +12,13 @@ import { User } from "./entities/user.entity";
 import { AdminAuthGuard } from "src/commons/guards/admin-auth.guard";
 import {CreateProfileDto} from "./dto/createProfile.dto";
 import {EmailUserNameLoginDto} from "./dto/emailLogin.dto";
+import {UserRepository} from "./repository/user.repository";
 
 @Controller('auth')
 export class AuthController {
-    constructor(private authService:AuthService) {}
+    constructor(private authService:AuthService,
+                private userRepository:UserRepository
+                ) {}
 
     @Post('register/user')
     signup(
@@ -31,13 +34,19 @@ export class AuthController {
 
     @Get('email/send-email-verification/:email')
     async sendEmailVerification(@Param('email') email: string) {
-      await this.authService.createEmailToken(email);
-      return this.authService.sendEmailVerification(email);
+        const user = await this.userRepository.findByEmail(email)
+        if (!user){
+            throw new NotFoundException('user does not exist')
+        }
+        const otp = Math.floor(100000 + Math.random() * 900000);
+        user.otp=otp
+        await this.authService.createEmailToken(email);
+        return this.authService.sendEmailVerification(email,otp);
     }
   
-    @Get('email/verify/:token')
-    verifyEmail(@Param('token') token: string) {
-      return this.authService.verifyEmail(token);
+    @Get('email/verify/:token/:otp')
+    verifyEmail(@Param('token') token: string,@Param('otp') otp:number) {
+      return this.authService.verifyEmail(token,otp);
     }
 
     @Get('email/forgot-password/:email')
@@ -45,9 +54,9 @@ export class AuthController {
       return this.authService.sendEmailForgottenPassword(email);
     }
   
-    @Post('email/reset-password')
-    setNewPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-      return this.authService.setNewPassword(resetPasswordDto);
+    @Post('email/reset-password/:otp')
+    setNewPassword(@Body() resetPasswordDto: ResetPasswordDto,@Param('otp') otp:number) {
+      return this.authService.setNewPassword(resetPasswordDto,otp);
     }
 
     

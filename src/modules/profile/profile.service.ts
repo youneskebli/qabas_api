@@ -69,7 +69,7 @@ export class ProfileService {
         if (image) {
             // profile.image= await this.awsService.fileUpload(image,'profile-images')
         }
-        const savedProfile= await profile.save()
+        const savedProfile:Profile= await profile.save()
         return savedProfile;
     }
 
@@ -79,7 +79,7 @@ export class ProfileService {
         //     await this.awsService.fileDelete(profile.image);
         //     profile.image= await this.awsService.fileUpload(image,'profile-images')
          }
-        const savedProfile=profile.save();
+        const savedProfile :Profile= await profile.save();
         return savedProfile;
     }
 

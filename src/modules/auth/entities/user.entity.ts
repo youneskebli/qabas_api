@@ -41,6 +41,9 @@ export class User extends BaseEntity {
     })
     isEmailVerified: boolean;
 
+    @Column({nullable:true})
+    otp:number
+
     @OneToOne(() => Profile, profile => profile.user,{eager:true,onDelete:"CASCADE",cascade:true})
     @JoinColumn()
     profile: Profile;

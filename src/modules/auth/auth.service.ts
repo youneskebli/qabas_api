@@ -28,7 +28,7 @@ export class AuthService {
               private profileService:ProfileService,
     ) {}
 
-  async signUp(authCredentialsDto: AuthCredentialsDto): Promise<void> {
+  async signUp(authCredentialsDto: AuthCredentialsDto): Promise<any> {
 const { username, password, email } = authCredentialsDto;
 if (!this.IsValidEmail(email)) {
 throw new BadRequestException('You have entered invalid email');
@@ -51,11 +51,16 @@ user.email = email;
 user.roles = [Role.USER];
 user.password = await this.userRepository.hashPassword(password, user.salt);
 user.profile = new Profile();
+// Generate a random 6-digit OTP
+const otp = Math.floor(100000 + Math.random() * 900000);
 // sending emails verification
 await this.createEmailToken(email);
-await this.sendEmailVerification(email);
-
+await this.sendEmailVerification(email,otp);
+user.otp=otp
 await user.save();
+const payload :JwtPayload= {emailOrUserName:email};
+const accessToken= this.jwtService.sign(payload);
+return {accessToken};
 }
 
 async signInUser(emailUserNameLoginDto:EmailUserNameLoginDto):Promise<{accessToken:string,user:User}> {
@@ -126,19 +131,17 @@ async signInUser(emailUserNameLoginDto:EmailUserNameLoginDto):Promise<{accessTok
   }
 }
 
-async sendEmailVerification(email: string): Promise<any> {
+async sendEmailVerification(email: string,otp:number): Promise<any> {
   const verifiedEmail = await this.emailVerificationRepo.findOne({where:{ email }});
-  if (verifiedEmail && verifiedEmail.emailToken) {
+  if ( verifiedEmail && verifiedEmail.emailToken) {
     const url = `<a style='text-decoration:none;'
-  href= http://${config.frontEndKeys.url}:${config.frontEndKeys.port}/${config.frontEndKeys.endpoints[1]}/${verifiedEmail.emailToken}>Click Here to confirm your email</a>`;
+  href= http://${config.frontEndKeys.url}:${config.frontEndKeys.port}/${config.frontEndKeys.endpoints[1]}/${verifiedEmail.emailToken}>Click here to verify your OTP</a>`;
     await this.nodeMailerService.sendMail({
       from: `Company <dive.innconu@gmail.com>`,
       to: email,
-      subject: 'Verify Email',
-      text: 'Verify Email',
-      html: `<h1>Hi User</h1> <br><br> <h2>Thanks for your registration</h2>
-<h3>Please Verify Your Email by clicking the following link</h3><br><br>
-      ${url}`,
+      subject: 'OTP Verification',
+      text: 'OTP Verification',
+      html: `<h1>Hi User</h1><br><br><h2>Your OTP is: ${otp}</h2><br><br>${url}`,
     }).then(info => {
       console.log('Message sent: %s', info.messageId);
     }).catch(err => {
@@ -149,15 +152,21 @@ async sendEmailVerification(email: string): Promise<any> {
   }
 }
 
-async verifyEmail(token: string): Promise<{ isFullyVerified: boolean, user: User }> {
+async verifyEmail(token: string,userEnteredOTP:number): Promise<{ isFullyVerified: boolean, user: User }> {
   const verifiedEmail = await this.emailVerificationRepo.findOne({where:{ emailToken: token }});
   if (verifiedEmail && verifiedEmail.email) {
     const user = await this.userRepository.findOne( {where:{email: verifiedEmail.email}} );
     if (user) {
-      user.isEmailVerified = true;
-      const updatedUser = await user.save();
-      await verifiedEmail.remove();
-      return { isFullyVerified: true, user: updatedUser };
+      if (user.otp === userEnteredOTP)  {
+          user.isEmailVerified = true;
+          const updatedUser = await user.save();
+          await verifiedEmail.remove();
+          user.otp=null
+          await user.save()
+          return { isFullyVerified: true, user: updatedUser };
+      }else {
+          throw new HttpException('INVALID_OTP', HttpStatus.BAD_REQUEST);
+      }
     }
   } else {
     throw new HttpException('LOGIN_EMAIL_CODE_NOT_VALID', HttpStatus.FORBIDDEN);
@@ -170,6 +179,10 @@ async deleteUser(id:number):Promise<DeleteResult>{
 
 async sendEmailForgottenPassword(email: string): Promise<any> {
   const user = await this.userRepository.findOne({where:{ email }});
+  // Generate a random 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000);
+  user.otp=otp
+  await user.save()
   if (!user) {
     throw new HttpException('LOGIN_USER_NOT_FOUND', HttpStatus.NOT_FOUND);
   }
@@ -180,10 +193,9 @@ async sendEmailForgottenPassword(email: string): Promise<any> {
     return await this.nodeMailerService.sendMail({
       from: '"Company" <' + config.nodeMailerOptions.transport.auth.user + '>',
       to: email,
-      subject: 'Reset Your Password',
-      text: 'Reset Your Password',
-      html: `<h1>Hi User</h1> <br><br> <h2>You have requested to reset your password , please click the following link to change your password</h2>
-   <h3>Please click the following link</h3><br><br>
+      subject: 'Reset Your Password OTP',
+      text: 'Reset Your Password OTP',
+      html: `<h1>Hi User</h1> <br><br> <h2>You have requested to reset your password , Your OTP is: ${otp}</h2><br><br>
       ${url}`,
     }).then(info => {
       console.log('Message sent: %s', info.messageId);
@@ -216,23 +228,38 @@ async checkPassword(email: string, password: string) {
   return await bcrypt.compare(password, user.password);
 }
 
-async setNewPassword(resetPasswordDto: ResetPasswordDto) {
+async setNewPassword(resetPasswordDto: ResetPasswordDto,otp:number) {
   let isNewPasswordChanged = false;
-  const { email, newPasswordToken, currentPassword, newPassword } = resetPasswordDto;
-  if (email && currentPassword) {
-    const isValidPassword = await this.checkPassword(email, currentPassword);
-    if (isValidPassword) {
-      isNewPasswordChanged = await this.setPassword(email, newPassword);
-    } else {
-      throw new HttpException('RESET_PASSWORD_WRONG_CURRENT_PASSWORD', HttpStatus.CONFLICT);
-    }
-  } else if (newPasswordToken) {
-    const forgottenPassword = await this.forgottenPasswordRepo.findOne({where:{ newPasswordToken }});
-    isNewPasswordChanged = await this.setPassword(forgottenPassword.email, newPassword);
-    if (isNewPasswordChanged) {
-      await this.forgottenPasswordRepo.delete(forgottenPassword.id);
-    }
-  } else {
+  const { email, newPasswordToken, currentPassword, newPassword,confirmPassword } = resetPasswordDto;
+  const user = await this.userRepository.findByEmail(email)
+  if (email && currentPassword && newPassword && confirmPassword) {
+      if (newPassword === confirmPassword){
+          const isValidPassword = await this.checkPassword(email, currentPassword);
+          if (isValidPassword) {
+              isNewPasswordChanged = await this.setPassword(email, newPassword);
+          } else {
+              throw new HttpException('RESET_PASSWORD_WRONG_CURRENT_PASSWORD', HttpStatus.CONFLICT);
+          }
+      }else{
+          throw new HttpException('PASSWORD_MISMATCH', HttpStatus.BAD_REQUEST);
+      }
+  } else if (newPasswordToken && newPassword && confirmPassword) {
+      if (newPassword === confirmPassword){
+          if (user.otp === otp){
+              const forgottenPassword = await this.forgottenPasswordRepo.findOne({where:{ newPasswordToken }});
+              isNewPasswordChanged = await this.setPassword(forgottenPassword.email, newPassword);
+              if (isNewPasswordChanged) {
+                  await this.forgottenPasswordRepo.delete(forgottenPassword.id);
+              }
+          }else
+          {
+              throw new HttpException('INVALID_OTP', HttpStatus.BAD_REQUEST);
+          }
+      }else{
+          throw new HttpException('PASSWORD_MISMATCH', HttpStatus.BAD_REQUEST);
+      }
+      }
+       else {
     return new HttpException('RESET_PASSWORD_CHANGE_PASSWORD_ERROR', HttpStatus.INTERNAL_SERVER_ERROR);
   }
   return isNewPasswordChanged;
